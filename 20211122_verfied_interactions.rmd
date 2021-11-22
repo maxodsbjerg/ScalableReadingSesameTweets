@@ -1,0 +1,233 @@
+---
+title: "Data processing"
+author: "Max Odsbjerg Pedersen"
+date: "24 10 2021"
+output: html_document
+---
+---
+title: "2. Who remembers - wht is the dynamic in these commenroative communities"
+author: "Max Odsbjerg Pedersen"
+date: "21 4 2021"
+output: 
+    html_document:
+      df_print: paged
+---
+
+# Introduction
+This document holds the R-code for the data processing creating the results discussed in the section *Who remembers - what is the dynamic in these commemorative communities?* in the article *Remember Sesame Street? A scalable analysis of the show’s history as remembered and negotiated on Twitter.* [LINK!!!] 
+
+This document is only concerned with documenting the code based steps taken in the data processing. The results, graph, tables etc. will be discussed in the article. This distinguish between doing the data processing and evaluating the result is of course unnatural, but the decision is made to make the article accessible for readers, who only has an interest for the results and not necessarily the data processing step. This document is thus an attempt to create as much transparency of the data processing for people interested.  
+
+
+# Importing packages
+Out is, as mentioned, processed in the software programme R, which offers various methods for statistical analysis and graphic representation of the results. In R, one works with packages each adding numerous functionalities to the core functions of R. In this document, the relevant packages are:
+
+
+```{r, message=FALSE}
+library(tidyverse)
+library(jsonlite)
+library(lubridate)
+```
+
+Documentation for each package: <br>
+*https://www.tidyverse.org/packages/ <br>
+*https://lubridate.tidyverse.org/ <br>
+*https://cran.r-project.org/web/packages/jsonlite/vignettes/json-aaquickstart.html<br>
+
+Additional information about R: 
+https://www.r-project.org/
+
+# Loading dataset
+The dataset collected from the Twitter-API[LINK!!!] is stored in the json-format. We thus loaded into R with the function `fromJSON` from the jsonlite-package. We name the dataset "Data_2015" and we will be using this name, when referring to the dataset in R.
+
+```{r}
+Data_2015 <- fromJSON("../data/20210316_sesameHBO_full_2015072900_201508282358.json")
+Data_2019 <- fromJSON("../data/20210512_SesameAnniversary_full_20191025_20191124.json")
+```
+
+# Who remembers
+
+
+## How many of the tweets from 2015 are verified accounts
+
+In this first example of data processing we will take each step of it to show the logic of the pipe (`%>%`) in R. Once you get a hold of this idea the remainder of the data processing will be more easy to read and understand. The overall goal of this section is to find out how the tweets disperses on non-verified and verified account and visualize the result . 
+
+
+Using the so-called pipe `%>%` we pass the data on downwards - the data is flowing through the pipe like water! Here we pour the data to the `count`-function and ask it to count on the column "verfied" that holds two values. Either it has "TRUE" - then the account is verfied - or it has "FALSE" - then it isn't.   
+
+```{r}
+Data_2015 %>% 
+  count(verified)
+```
+So now we have the count - but we would prefer to have these figures in percentage. Therefore our next step will be adding another pipe and a pieces of code creating a new column holding the number of total tweets in our dataset - this is necessary for calculating the percentage later. We get the total number of tweets by using the `nrow`-function that returns the number of rows from a dataframe. In our dataset one row = one tweet
+
+```{r}
+Data_2015 %>% 
+  count(verified) %>% 
+  mutate(total = nrow(Data_2015))
+```
+
+Using another pipe we now create a new column called "percentage" where we calculate and store the percentage of the dispersion between verified and non-verified tweets:
+
+```{r}
+Data_2015 %>% 
+  count(verified) %>% 
+  mutate(total = nrow(Data_2015)) %>% 
+  mutate(pct = (n / total) * 100)
+```
+The next step is to visualize this result. Here we use the "ggplot2"-package to create a bar chart:  
+
+The difference from the earlier visualisations showing tweets over time is here the type of plot used, this is specified with the `geom_col()` argument. 
+
+```{r}
+Data_2015 %>% 
+  count(verified) %>% 
+  mutate(total = nrow(Data_2015)) %>% 
+  mutate(pct = (n / total) * 100) %>% 
+  ggplot(aes(x = verified, y = pct)) +
+  geom_col() +
+  scale_x_discrete(labels=c("FALSE" = "Not Verified", "TRUE" = "Verified"))+
+      labs(x = "Verified status",
+      y = "Percentage",
+      title = "Figure 3 - Percentage of tweets coming from verified and non-verified\naccounts in the 2015-dataset",
+      subtitle = "Period: 29 July 2015 - 28 August 2015", 
+      caption = "Total number of tweets: 78,688") + 
+  theme(axis.text.y = element_text(angle = 14, hjust = 1))
+```
+In this next code chunk we save the result for the article. 
+```{r}
+ggsave("20211014_2015_tweets_dispersed_on_verified_status.png", width = 8, height = 5, dpi = 800)
+```
+
+
+## How many of the tweets from 2019 are verified accounts
+Since we have seen the general logic of the dataprocessing we jump right to the visualisation here. The only differences is that it is now the 2019 data and some changes in titles.
+
+```{r}
+Data_2019 %>% 
+  count(verified) %>% 
+  mutate(total = nrow(Data_2019)) %>% 
+  mutate(pct = (n / total) * 100) %>% 
+  ggplot(aes(x = verified, y = pct)) +
+  geom_col() +
+  scale_x_discrete(labels=c("FALSE" = "Not Verified", "TRUE" = "Verified"))+
+      labs(x = "Verified status",
+      y = "Percentage",
+      title = "Figure 4 - Percentage of tweets coming from verified and non-verified\naccounts in the 2019-dataset",
+      subtitle = "Period: 25 October 2019 - 24 November 2019", 
+      caption = "Total number of tweets: 117,006") + 
+  theme(axis.text.y = element_text(angle = 14, hjust = 1))
+```
+
+Next step is to save the visualisation for the article:
+
+```{r}
+ggsave("20211014_2019_tweets_dispersed_on_verified_status.png", width = 8, height = 5, dpi = 800)
+```
+
+
+
+# Means of different interaction count dispersed on the verified status in the 2015 dataset
+In the code below we first group the dataset based on each tweets verified status. After using the grouping function all operations afterwards will be done groupwise. In other words all the tweets coming from non verified-accounts and all the tweets coming from verified accounts we be treated as groups. The next step is to use the summarise-function to calculate the mean (gns) of favorite_count for within tweets from non-verified and verified accounts.  
+
+```{r}
+Data_2015 %>% 
+  group_by(verified) %>% 
+  summarise(gns = mean(favorite_count))
+```
+
+In this next step we add the result from above to a dataframe and with a new column "interaction" where we specify that it is "favorite_count"
+
+```{r}
+interactions_2015 <- Data_2015 %>% 
+  group_by(verified) %>% 
+  summarise(gns = mean(favorite_count)) %>% 
+  mutate(interaction = "favorite_count")
+```
+In the next step we calculate the means for retweets and reply following the same method as we did with the favorite count:
+```{r}
+interactions_2015 %>% 
+  add_row(
+    Data_2015 %>% 
+      group_by(verified) %>% 
+      summarise(gns = mean(retweet_count), .groups = "drop") %>% 
+      mutate(interaction = "retweet_count")) %>% 
+  add_row(
+    Data_2015 %>% 
+      group_by(verified) %>% 
+      summarise(gns = mean(reply_count), .groups = "drop") %>% 
+      mutate(interaction = "reply_count"))
+```
+This way we get a dataframe with the means of the different interactions which makes it possible to pass it on to the ggplot-package for visualisation, which is done below. The visualisation looks alot like the previous bar charts, but the difference here is `facet_wrap`, which creates three bar charts for each type of interaction:
+
+
+```{r}
+interactions_2015 %>% 
+  add_row(
+    Data_2015 %>% 
+      group_by(verified) %>% 
+      summarise(gns = mean(retweet_count), .groups = "drop") %>% 
+      mutate(interaction = "retweet_count")) %>% 
+  add_row(
+    Data_2015 %>% 
+      group_by(verified) %>% 
+      summarise(gns = mean(reply_count), .groups = "drop") %>% 
+      mutate(interaction = "reply_count")) %>% 
+  ggplot(aes(x = verified, y = gns)) +
+  geom_col() +
+  facet_wrap(~interaction, nrow = 1) +
+  labs(title = "Figure 5 - Means of different interaction count dispersed on the verified\nstatus in the 2015 dataset",
+       subtitle = "Period: Period: 29 July 2015 - 28 August 2015",
+       caption = "Total number of tweets: 78,688",
+       x = "Verified status",
+       y = "Average of engagements counts") +
+  scale_x_discrete(labels=c("FALSE" = "Not Verified", "TRUE" = "Verified"))
+```
+In the next step we save the visualisation as png for the article. 
+
+```{r}
+ggsave("20211114_2015_interactions_dispersed_on_verified_status.png", width = 8, height = 5, dpi = 800)
+```
+
+# Means of different interaction count dispersed on the verified status in the 2019 dataset
+
+In the following the data processing will be identical to the one from the one above on the 2015 dataset. The only difference is that the data in this case comes from the 2019 dataset and changes to titles, 
+
+```{r}
+interactions_2019 <- Data_2019 %>% 
+  group_by(verified) %>% 
+  summarise(gns = mean(favorite_count)) %>% 
+  mutate(interaction = "favorite_count")
+```
+
+
+
+```{r}
+interactions_2019 %>% 
+  add_row(
+    Data_2019 %>% 
+      group_by(verified) %>% 
+      summarise(gns = mean(retweet_count), .groups = "drop") %>% 
+      mutate(interaction = "retweet_count")) %>% 
+  add_row(
+    Data_2019 %>% 
+      group_by(verified) %>% 
+      summarise(gns = mean(reply_count), .groups = "drop") %>% 
+      mutate(interaction = "reply_count")) %>% 
+  ggplot(aes(x = verified, y = gns)) +
+  geom_col() +
+  facet_wrap(~interaction, nrow = 1) +
+  labs(title = "Figure 6 - Means of different interaction count dispersed on the verified\nstatus in the 2019 dataset",
+       subtitle = "Period: Period: 25 October - 24 November 2019",
+       caption = "Total number of tweets: 117,006",
+       x = "Verified status",
+       y = "Average of engagements counts") +
+  scale_x_discrete(labels=c("FALSE" = "Not Verified", "TRUE" = "Verified"))
+```
+
+
+```{r}
+ggsave("20211014_2019_interactions_dispersed_on_verified_status.png", width = 8, height = 5, dpi = 800)
+```
+
+

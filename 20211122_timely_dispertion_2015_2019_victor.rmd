@@ -1,0 +1,110 @@
+---
+title: "Timely dispersion of tweets in the 2015 and 2019 dataset"
+author: "Max Odsbjerg Pedersen"
+date: "20 10 2021"
+output: html_document
+---
+This document contains the code used for the dataprocessing and the creation of visualisations in the article *Who remembers Sesame Street? A scalable analysis of mnemonic practices on Twitter.*. 
+
+The code is R which is an free open-source software environment for statistical computing and graphics. ("The R Project for Statistical Computing", The R Foundation, accessed October 20, 2021, https://www.r-project.org ). 
+
+# Loading libraries
+Since R is open-source there is a lot of so-called packages(sometimes called libraries) that expands the core functionality of R. In this project we have been using the following three packages, which are loaded into R with the function `library()`
+```{r}
+library(tidyverse)
+library(jsonlite)
+library(lubridate)
+```
+
+## tidyverse
+The package "tidyverse" is an umbrella package loading several libraries that are all handy in terms of working with data. For further information on and learning to use tidyverse see https://www.tidyverse.org. 
+
+Wickham H, Averick M, Bryan J, Chang W, McGowan LD, François R, Grolemund G, Hayes A, Henry L, Hester J, Kuhn M, Pedersen TL, Miller E, Bache SM, Müller K, Ooms J, Robinson D, Seidel DP, Spinu V, Takahashi K, Vaughan D, Wilke C, Woo K, Yutani H (2019). “Welcome to the tidyverse.” Journal of Open Source Software, 4(43), 1686. doi: 10.21105/joss.01686
+
+## jsonlite
+The package "jsonlite" is for handling the dataformat Javascript Object Notation (json), which is a format used for exchanging data on the internet. For more information on the jsonlite-package see https://cran.r-project.org/web/packages/jsonlite/index.html
+
+Ooms J (2014). “The jsonlite Package: A Practical and Consistent Mapping Between JSON Data and R Objects.” arXiv:1403.2805 [stat.CO]. https://arxiv.org/abs/1403.2805.
+
+## lubridate
+The package lubridate is used for handling different date formats in R and doing operations on them. The package in from the same group behind the package "tidyverse", but is not a core package in the "tidyverse". 
+
+Garrett Grolemund, Hadley Wickham (2011). Dates and Times Made Easy with lubridate. Journal of Statistical Software, 40(3), 1-25. URL https://www.jstatsoft.org/v40/i03/.
+
+# Loading the data
+We load the data from the Twitter API using the `fromJSON()`-function from the "jsonlite"-package. This function tramsforms the data from the nested nature of json into the rectangular nature of dataframes in R. In this step we load both the data from 2015 and 2019. 
+
+```{r}
+Data_2015 <- fromJSON("../../data/20210316_sesameHBO_full_2015072900_201508282358.json")
+Data_2019 <- fromJSON("../../data/20210512_SesameAnniversary_full_20191025_20191124.json")
+```
+
+## Timedispersion 2015 - for article
+In the following we start of with some data processing before moving on to the actual visualisation. The question we are asking the data here is a two-piece one. First of we want to know the dispersion of the tweets over time. Second we want to know how many of these contain a the hashtag "#sesamestreet". Especially the last question needs some data wranglig before it is possible to answer it. The process here is to create a new column which has the value "TRUE" if the tweet contains the hashtag and FALSE if not. This is done with the `mutate()`-function, which creates a new column called "has_sesame_ht". To put the TRUE/FALSE-values in this column we use the  `str_detect()`-function. This function is told that it is detecting on the column "text", which contains the tweet. Next it is told what it is detecting. Here we use the `regex()`-function within `str_detect()` and by doing that we can specify that we are interested in all variants of the hashtag (eg #SesameStreet, #Sesamestreet, #sesamestreet, #SESAMESTREET, etc.).  This is achieved by setting "ignore_case = TRUE".
+The next step is another `mutate()`-function, where we create a new column "date". This column will contain just the date of the tweets instead of the entire timestamp from Twitter that not only contains the date, but also the hour, minute and second of the Tweet. This is obtained with the `date()`-function from the "lubridate"-packages, which is told that it should extract the date from the "created_at"-column.  
+Lastly we use the `count`-function from the "tidyverse"-package to count TRUE/FALSE-values in the "has_same_ht"-column per day in the data set. 
+
+```{r}
+Data_2015 %>% 
+  mutate(has_sesame_ht = str_detect(text, regex("#sesamestreet", ignore_case = TRUE))) %>% 
+  mutate(date = date(created_at)) %>% 
+  count(date, has_sesame_ht)
+```
+
+This is the result we now want to visualise. In the code below we have appended the code for the visualisation to the four lines of code above that transforms the data to our needs.  
+To pick up where we left in the previous code chunk we continue with the `ggplot()`-function, which is the graphics package of the "tidyverse". This function is told that it should put date on the x-axis and the counted number of TRUE/FALSE-values on the y-axis. The next line of the creation of the visualisation is `geom_line()`,where we specify linetype=has_sesame_ht, thus creating creating two lines for; one for TRUE and one for FALSE. 
+
+The lines of code following the `geom_line()` argument tweaks the aesthetics of the visualisation. `scale_linetype()`tells R, what the lines should be labeled as. `scale_x_date()` and `scale_y_continuous()` changes the looks of the x- and y-axis respectively. At last, the `labs()` and `guides()` arguments are used to create descriptive text on the visualisation.
+
+```{r}
+Data_2015 %>% 
+  mutate(has_sesame_ht = str_detect(text, regex("#sesamestreet", ignore_case = TRUE))) %>% 
+  mutate(date = date(created_at)) %>% 
+  count(date, has_sesame_ht) %>% 
+  ggplot(aes(date, n)) +
+  geom_line(aes(linetype=has_sesame_ht)) +
+  scale_linetype(labels = c("No #sesamestreet", "#sesamestreet")) +
+  scale_x_date(date_breaks = "2 day", date_labels = "%b %d") +
+  scale_y_continuous(breaks = seq(0, 30000, by = 5000)) +
+  theme(axis.text.x=element_text(angle=40, hjust=1)) +
+  labs(title = "Figure 1 - Daily tweets dispersed on whether or not they\ncontain #sesamestreet", y="Number of Tweets", x="Day", subtitle = "Period: 29 July 2015 - 28 August 2015", caption = "Total number of tweets: 78,688") +
+  guides(linetype = guide_legend(title = "Whether or not the\ntweet contains \n#sesamestreet"))
+```
+
+
+In the next codechunk we save the plot as a png-file for the article:
+
+```{r}
+ggsave("20211122_2015_tweet_timeline_dispersed_on_hastag_or_not.png", width = 8, height = 5, dpi = 800)
+```
+
+## Timedispersion 2019
+In this section we repeat the process for the 2019-dataset. The codes will be the same exept that it is running on the 2019-data. Besides that the titles have been changed corresponding. 
+
+```{r}
+Data_2019 %>% 
+  mutate(has_sesame_ht = str_detect(text, regex("#sesamestreet", ignore_case = T))) %>% 
+  mutate(date = date(created_at)) %>% 
+  count(date, has_sesame_ht)
+```
+
+
+```{r}
+Data_2019 %>% 
+  mutate(has_sesame_ht = str_detect(text, regex("#sesamestreet", ignore_case = T))) %>% 
+  mutate(date = date(created_at)) %>% 
+  count(date, has_sesame_ht) %>% 
+  ggplot(aes(date, n)) +
+  geom_line(aes(linetype=has_sesame_ht)) +
+  scale_linetype(labels = c("No #sesamestreet", "#sesamestreet")) +
+  scale_x_date(date_breaks = "2 day", date_labels = "%b %d") +
+  scale_y_continuous(breaks = seq(0, 30000, by = 5000)) +
+  theme(axis.text.x=element_text(angle=40, hjust=1)) +
+  labs(title = "Figure 2 - Daily tweets dispersed on whether or not they\ncontain #sesamestreet", y="Number of Tweets", x="Day", subtitle = "Period: 25 October 2019 - 24 November 2019", caption = "Total number of tweets: 117,006") +
+  guides(linetype = guide_legend(title = "Whether or not the\ntweet contains \n#sesamestreet"))
+```
+
+```{r}
+ggsave("20211122_2019_tweet_timeline_dispersed_on_hastag_or_not.png", width = 8, height = 5, dpi = 800)
+```
+
