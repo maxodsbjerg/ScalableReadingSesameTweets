@@ -1,0 +1,201 @@
+---
+title: "Teplate for Top 20's Analysis: Top 20 most commented tweets 2015"
+author: "Josephine Møller Jensen"
+date: "22 11 2021"
+output: html_document
+---
+
+
+# Step 0. Introduction
+
+This R Markdown was created to extract the top 20 most commented tweets in the SHAPES project's 2015 dataset, in order to conduct a close reading analysis of the tweets with most user engagement.
+
+> Note: this is the same workflow which has been used to extract the 'top 20' most commented, liked and retweeted tweets in both the 2015 and 2019 dataset.
+
+For the purpose of our analysis, we will also extract the top 20 most commented tweets created by non-verified twitter accounts. The final output of our script will therefore be two JSON files: 
+
+1. one containing the top 20 most commented tweets in the entire dataset,
+2. and another only containing the 20 most commented tweets created by non-verified accounts.
+
+To ensure that our methodological approach is transparent and reproducible for readers with only a basic understanding of coding in R, we have included a thorough description of what each "code chunk" does along the way. 
+
+We have furthermore based our code on the tidy data principles. These principles is based on each column being a variable and each row being an observation. To learn more about the Tidy approach, see the introduction of the online book “R “for Data Science:
+
+* https://r4ds.had.co.nz/introduction.html
+
+
+# Step 1. Installation of packages
+
+In the code chunk below, you can see the packages which have been used to process and visualize our data. 
+
+The packages can be acquired by installing them directly from the R Studios CRAN repository, where you will also find additional information about the packages:
+
+1. https://cran.r-project.org/web/packages/tidyverse/index.html
+2. https://cran.r-project.org/web/packages/jsonlite/index.html 
+
+> Note: we are using the tidyverse package, which is a collection of multiple R packages. Throughout this Markdown, we will point out which packages within the tidyverse we are using, and what function within each package is being used in the code chunk below.
+
+```{r}
+library(tidyverse)
+library(jsonlite)
+```
+
+
+# Step 2. Loading the 2015 data into a Markdown document
+
+Our 2015 data has been stored as a JSON file on the SHAPES project server provided by Aarhus University in accordance with Twitters Premium API Terms and Conditions and GDPR (EU). It consists of data acquired from our initial Twitter API free-text search for tweets created within the period 29/07/2015 00:00 to 28/08/2015 23:58. 
+
+As we upload our data into our R Global Environment using the `fromJSON`-function from the jsonlite package, we therefore choose to name our data *Data_2015*.
+
+If you wish to reproduce our script using your own acquired twitter data, there are a number of tools you can use to access the Twitter API. 
+
+> See for exsample The Programming Historians's lesson "Beginner's Guide to Twitter Data" or use the functions offered in the rtweet package.
+
+* https://programminghistorian.org/en/lessons/beginners-guide-to-twitter-data
+* https://cran.r-project.org/web/packages/rtweet/rtweet.pdf
+
+```{r}
+Data_2015 <- fromJSON("../20210316_sesameHBO_full_2015072900_201508282358.json")
+```
+
+
+# Step 3. Filtering for original tweets and observing the minimum reply_count value for the top 20
+
+As we are only interested in original tweets, we start by filtering away all the tweets that are "retweets". 
+
+Viewing our data *Data_2015* in our Global Environment, we see that the column is_retweet indicates whether a tweet is a retweet by the values TRUE or FALSE. We are therefore able to use the `filter`-function to retain all rows stating that the tweet is not a retweet.
+
+We then arrange the remaining tweets by the tweets' comment count which is found in the reply_count column. 
+
+Both the `filter`-function and the `arrange`-function come from the dplyr package which is part of the tidyverse. 
+
+```{r}
+Data_2015 %>% 
+  filter(is_retweet == FALSE) %>% 
+  arrange(desc(reply_count))
+```
+
+As we can see in our Global Environment, our data *Data_2015* has a total of 78,688 observations.
+After running our chunk of code, we can now read off our returned data.frame that there are 49,312 observations. Meaning 49,312 original tweets that are not marked as retweets.
+
+Looking at the column reply_count, we can now observe that the top 20 most commented tweets all have a count that is above 18, with 3 tweets shearing the 20th place. We therefore get the top 22 most commented tweets for this analysis.
+
+
+# Step 4. Creating a new dataset of the top 22 most commented tweets (all accounts)
+
+As we now know that the minimum reply_count value is 18, we add a second `filter`-function to our previous code chunk which retains all rows with a reply_count value over 18. 
+
+As we have now captured all the top 20/22 most commented tweets, we can now create a new dataset called *Data_2015_reply_count_over_18*. 
+
+```{r}
+Data_2015 %>% 
+  filter(is_retweet == FALSE) %>%
+  filter(reply_count > 18) %>% 
+  arrange(desc(reply_count)) -> Data_2015_reply_count_over_18
+```
+
+
+# Step 5. Inspecting our new dafaframe (all)
+
+To create a quick overview of our new dataset, we use the `select`-function from the dplyr-package to isolate the variables we wish to inspect. In this case, we wish to isolate the columns reply_count, screen_name, verified and text.
+
+We then arrange them after their reply_count value by using the `arrange`-function. 
+
+```{r}
+Data_2015_reply_count_over_18 %>% 
+  select(reply_count, screen_name, verified, text) %>% 
+  arrange(desc(reply_count))
+```
+
+This code chunk returns a data.frame containing the previously stated values. It is therefore much easier to inspect, than looking though the whole dataset *Data_2015_reply_count_over_18* in our Global Environment.
+
+
+# Step 6. Exporting the new dataset in JSON file format
+
+To export our new dataset out of our R environment and save it as a JSON file, we use `toJSON`-function the jsonlite-package. 
+
+Too make sure our data is stored as manageable and structured as possible, all of our close reading data files are dubbed with the same information:
+
+1. How many tweets/observations the data contains.
+2. What variable the data is arranged after.
+3. Whether the tweets are from all types of accounts or just the verified accounts.
+4. The year the data was produced.
+
+
+```{r}
+Top_22_commented_tweets_all_2015 <- jsonlite::toJSON(Data_2015_reply_count_over_18)
+
+```
+
+
+After converting our data to a JSON file format, we are able to use the `write`-function from R basics to export the data and save it on a local server.
+
+
+```{r}
+write(Top_22_commented_tweets_all_2015, "Top_22_commented_tweets_all_2015.json")
+```
+
+
+# Step 7. Creating a new dataset of the top 20 most commented tweets (non-verified accounts)
+
+We now wish to see  the top 20 most commented tweets by the non-verified accounts.
+
+To do this, we follow the same workflow as before (from step 3 to 6), but in our first code chunk, we include an extra `filter`-function from the dplyr-package which retains all rows with the value FALSE in the verified column, thereby removing all tweets from our data which have been produced by verified accounts. 
+
+```{r}
+Data_2015 %>% 
+  filter(is_retweet == FALSE) %>%
+  filter(verified == FALSE) %>% 
+  arrange(desc(reply_count))
+```
+
+We observe in the returned data.frame that 46,271 of the total 78,688 observations are not retweets AND are from non-verified accounts. 
+
+Looking again at the reply_count column, we observe that the top 20 most commented tweets by non-verified accounts all have a count that is above 8. This time, 9 tweets share the 19th and 20th place. We therefore get the top 27 most commented tweets for this analysis.
+
+We can now filter away tweets that have been commented more than 8 times, and arrange them from the most commented to the least, and create a new dataset in our Global Environment called *Data_2015_reply_count_over_8_non_verified*.
+
+```{r}
+Data_2015 %>% 
+  filter(is_retweet == FALSE) %>%
+  filter(verified == FALSE) %>%
+  filter(reply_count > 8) %>% 
+  arrange(desc(reply_count)) -> Data_2015_reply_count_over_8_non_verified
+```
+
+
+# Step 8. Inspecting our new dafaframe (non-verified)
+
+We once again create a quick overview of our new dataset by using the `select` and `arrange`-function as in Step 5, and inspect our chosen values in the returned data.frame.
+
+```{r}
+Data_2015_reply_count_over_8_non_verified %>% 
+  select(reply_count, screen_name, verified, text) %>% 
+  arrange(desc(reply_count))
+```
+
+
+# Step 9. Exporting the new dataset in JSON file format
+
+Once again we use the `toJSON`-function to export our data into a local JSON file.
+
+```{r}
+Top_27_commented_tweets_non_verified_2015 <- jsonlite::toJSON(Data_2015_reply_count_over_8_non_verified)
+
+```
+
+```{r}
+write(Top_27_commented_tweets_non_verified_2015, "Top_27_commented_tweets_non_verified_2015.json")
+```
+
+You should now have two JSON files stored in your designated directory, ready to be loaded into another R Markdown for a close reading analysis, or you can inspect the text column of the datasets in your current R Global Environment.
+
+
+# Step 10. Share your findeings with us! 
+
+We hope you enjoyed following this R Markdown for locating and exporting the top most commented tweets from a twitter dataset.
+
+> If you wish to extract the 'top 20' most liked or retweeted tweets, as we have  done in our article *Who remembers Sesame Street? A scalable analysis of mnemonic practices on Twitter*, be aware that these categories are called favorite_count and retweet_count. 
+
+If you have any questions, comments or suggestions, we would love to hear your feedback!
+
